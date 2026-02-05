@@ -1,0 +1,1662 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Counting Money (SGD) — Count On</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="./kimsze_sharp16.ico?v=20260111a" sizes="any">
+  <link rel="shortcut icon" href="./kimsze_sharp16.ico?v=20260111a">
+
+  <!-- ✅ Always-Clear on Load (Default Build Contract) -->
+  <script>
+  (function(){
+    const ACTIVITY_ID = (window.ACTIVITY_ID || (location.origin + location.pathname));
+    try{
+      const del = [];
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(!k) continue;
+        if(k === ACTIVITY_ID) del.push(k);
+        if(k.startsWith(ACTIVITY_ID+"::")) del.push(k);
+        if(k.startsWith("sls_scope::"+ACTIVITY_ID)) del.push(k);
+        if(k.startsWith("UFCO-firstSubmit::"+ACTIVITY_ID)) del.push(k);
+        if(k.startsWith("sls_unlike_payload::"+ACTIVITY_ID)) del.push(k);
+        if(k.startsWith("UFCO-")) del.push(k);
+      }
+      del.push("UFCO-session","UFCO-resume","UFCO-last");
+      del.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+
+      try{
+        const bc = new BroadcastChannel("xapi-state");
+        bc.postMessage({type:"clear", activityId:ACTIVITY_ID, ts:Date.now()});
+        bc.close();
+      }catch(e){}
+    }catch(e){}
+  })();
+  </script>
+
+  <style>
+    :root{
+      --bg1:#0a0f2a;
+      --bg2:#0b2a4a;
+      --bg3:#2b1558;
+      --ink:#f3f7ff;
+      --muted:rgba(243,247,255,.75);
+      --line:rgba(255,255,255,.14);
+
+      --good:#22c55e;
+      --bad:#ef4444;
+
+      --pink:#ff4fd8;
+      --cyan:#42e6ff;
+      --lime:#68ff9d;
+      --gold:#ffd25a;
+
+      --shadow:0 18px 52px rgba(0,0,0,.38);
+      --r:24px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--font);
+      color:var(--ink);
+      min-height:100vh;
+      overflow-x:hidden;
+      background:
+        radial-gradient(1200px 700px at 15% 10%, rgba(66,230,255,.22), transparent 60%),
+        radial-gradient(900px 600px at 85% 20%, rgba(255,79,216,.18), transparent 60%),
+        radial-gradient(900px 700px at 40% 90%, rgba(104,255,157,.14), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg2) 55%, var(--bg3));
+    }
+
+    /* Cute sparkles (pure CSS) */
+    body:before{
+      content:"";
+      position:fixed; inset:0;
+      pointer-events:none;
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255,255,255,.18) 0 2px, transparent 3px),
+        radial-gradient(circle at 24% 70%, rgba(255,255,255,.12) 0 2px, transparent 3px),
+        radial-gradient(circle at 70% 30%, rgba(255,255,255,.12) 0 2px, transparent 3px),
+        radial-gradient(circle at 88% 72%, rgba(255,255,255,.16) 0 2px, transparent 3px),
+        radial-gradient(circle at 52% 14%, rgba(255,255,255,.10) 0 2px, transparent 3px);
+      opacity:.65;
+      mix-blend-mode:screen;
+    }
+
+    .wrap{max-width:1180px;margin:0 auto;padding:18px 14px 68px;}
+    header{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+      padding:12px 12px 8px;
+    }
+    .title{display:flex;gap:12px;align-items:flex-start;}
+    .badge{
+      width:52px;height:52px;border-radius:18px;
+      background:linear-gradient(135deg, rgba(66,230,255,.92), rgba(255,79,216,.88));
+      display:grid;place-items:center;
+      box-shadow:0 18px 46px rgba(0,0,0,.34);
+      border:1px solid rgba(255,255,255,.18);
+      flex:0 0 auto;
+    }
+    .badge svg{width:30px;height:30px;opacity:.95}
+    h1{
+      margin:0;
+      font-size:26px;
+      letter-spacing:.2px;
+      line-height:1.05;
+      text-shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    .sub{
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.45;
+      max-width:820px;
+    }
+    .sub b{color:#fff}
+
+    .topActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+    .pill{
+      padding:10px 12px;border-radius:999px;border:1px solid var(--line);
+      background:rgba(255,255,255,.08);
+      color:var(--ink);
+      display:flex;gap:10px;align-items:center;font-size:13px;
+      box-shadow:0 12px 30px rgba(0,0,0,.20);
+      user-select:none;
+      backdrop-filter: blur(10px);
+    }
+    .pill input{transform:translateY(1px)}
+    .statusDot{
+      width:10px;height:10px;border-radius:50%;
+      background:rgba(255,255,255,.25);
+      box-shadow:0 0 0 8px rgba(255,255,255,.06);
+    }
+    .statusDot.ready{background:rgba(104,255,157,.95);box-shadow:0 0 0 10px rgba(104,255,157,.14)}
+    .statusDot.speaking{
+      background:rgba(66,230,255,.95);
+      box-shadow:0 0 0 10px rgba(66,230,255,.18);
+      animation:pulse 1.05s ease-in-out infinite;
+    }
+    @keyframes pulse{
+      0%{transform:scale(1);opacity:.9}
+      50%{transform:scale(1.18);opacity:1}
+      100%{transform:scale(1);opacity:.9}
+    }
+
+    .btn{
+      border:0;
+      background:linear-gradient(135deg, rgba(66,230,255,.98), rgba(255,79,216,.90));
+      color:#071024;
+      font-weight:1000;
+      padding:11px 16px;
+      border-radius:16px;
+      cursor:pointer;
+      box-shadow:var(--shadow);
+      transition:transform .12s ease, filter .12s ease;
+      white-space:nowrap;
+    }
+    .btn:hover{filter:brightness(1.04)}
+    .btn:active{transform:scale(.98)}
+    .btn.ghost{
+      background:rgba(255,255,255,.08);
+      color:var(--ink);
+      border:1px solid var(--line);
+      box-shadow:0 12px 30px rgba(0,0,0,.20);
+      backdrop-filter: blur(10px);
+    }
+    .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+    .grid{display:grid;grid-template-columns: 1.25fr .75fr;gap:14px;margin-top:12px;}
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} .topActions{justify-content:flex-start} }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      border:1px solid var(--line);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(14px);
+    }
+    .cardHead{
+      padding:14px 14px 12px;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      background:rgba(0,0,0,.18);
+      border-bottom:1px solid var(--line);
+    }
+    .cardHead h2{margin:0;font-size:15px}
+    .cardBody{padding:14px}
+
+    .modeTabs{display:flex;gap:10px;flex-wrap:wrap;}
+    .tab{
+      padding:10px 14px;border-radius:999px;border:1px solid var(--line);
+      background:rgba(255,255,255,.08);
+      color:var(--ink);
+      cursor:pointer;
+      font-weight:1000;
+      font-size:14px;
+      user-select:none;
+      backdrop-filter: blur(10px);
+      transition:transform .12s ease, filter .12s ease;
+    }
+    .tab:hover{filter:brightness(1.04)}
+    .tab.active{
+      background:linear-gradient(135deg, rgba(104,255,157,.18), rgba(66,230,255,.16));
+      border-color:rgba(66,230,255,.35);
+    }
+    .tab.locked{opacity:.55;cursor:not-allowed;filter:none}
+
+    .hint{color:var(--muted);font-size:14px;line-height:1.45;margin:0 0 10px;}
+    .chipStat{
+      padding:9px 12px;border-radius:999px;border:1px solid var(--line);
+      background:rgba(255,255,255,.08);
+      color:var(--ink);
+      font-weight:1000;
+      font-size:13px;
+      backdrop-filter: blur(10px);
+      display:inline-flex;gap:8px;align-items:center;
+    }
+    .chipStat .miniDot{
+      width:9px;height:9px;border-radius:50%;
+      background:rgba(255,255,255,.28);
+    }
+
+    /* Money visuals wrapper */
+    .moneyRow{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+    .moneyItem{
+      position:relative;
+      width:140px;height:92px;border-radius:20px;
+      border:2px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.07);
+      box-shadow:0 14px 30px rgba(0,0,0,.28);
+      overflow:hidden;
+      display:grid;place-items:center;
+      padding-top:10px;
+      transform:translateZ(0);
+      transition:transform .12s ease, box-shadow .12s ease, outline .12s ease, opacity .12s ease, filter .12s ease;
+    }
+    .moneyItem.small{ width:106px;height:86px;border-radius:20px; }
+    .moneyItem .label{
+      position:absolute;left:10px;top:8px;
+      font-size:12px;
+      color:#fff;
+      font-weight:1000;
+      letter-spacing:.2px;
+      z-index:5;
+      padding:5px 8px;
+      border-radius:999px;
+      background:rgba(0,0,0,.72); /* ✅ opaque */
+      border:1px solid rgba(255,255,255,.18);
+      text-shadow:0 2px 6px rgba(0,0,0,.35);
+    }
+    .moneyItem .kind{
+      position:absolute;right:10px;top:8px;
+      font-size:11px;
+      color:#fff;
+      font-weight:1000;
+      z-index:5;
+      padding:5px 8px;
+      border-radius:999px;
+      background:rgba(0,0,0,.60);
+      border:1px solid rgba(255,255,255,.16);
+      letter-spacing:.6px;
+    }
+    .moneyItem.dim{ opacity:.35; filter:saturate(.85) brightness(.92); }
+    .moneyItem.highlight{
+      opacity:1;
+      outline:4px solid rgba(66,230,255,.85);
+      box-shadow:
+        0 0 0 10px rgba(66,230,255,.18),
+        0 20px 52px rgba(0,0,0,.34);
+      transform:translateY(-2px) scale(1.01);
+      filter:saturate(1.10) brightness(1.06);
+    }
+    .moneyItem.counted{
+      opacity:1;
+      outline:3px solid rgba(104,255,157,.55);
+      box-shadow:0 14px 32px rgba(0,0,0,.26);
+      filter:saturate(1.08) brightness(1.04);
+    }
+
+    /* Hide extra value badges in QUIZ only */
+    .moneyRow.quizMode .moneyItem .label,
+    .moneyRow.quizMode .moneyItem .kind{
+      display:none;
+    }
+
+    /* === SOLID (kid-friendly) notes & coins === */
+    .moneyItem .coin,
+    .moneyItem .noteCard,
+    .moneyItem .coinOct{ color:#0b1220; }
+
+    /* Coins: solid fill + subtle shine */
+    .moneyItem .coin{
+      width:70px;height:70px;border-radius:50%;
+      display:grid;place-items:center;
+      position:relative;
+      border:3px solid rgba(255,255,255,.62);
+      box-shadow:0 14px 22px rgba(0,0,0,.22);
+      user-select:none;
+      overflow:hidden;
+    }
+    .moneyItem .coin:before{
+      content:"";
+      position:absolute; inset:0;
+      border-radius:50%;
+      background: radial-gradient(circle at 28% 25%, rgba(255,255,255,.58), rgba(255,255,255,0) 50%);
+      pointer-events:none;
+      opacity:.95;
+    }
+    .moneyItem .coin .inner{
+      width:54px;height:54px;border-radius:50%;
+      display:grid;place-items:center;
+      border:2px solid rgba(0,0,0,.12);
+      background:rgba(255,255,255,.88); /* solid */
+      font-weight:1000;
+      letter-spacing:.2px;
+      color:#0b1220;
+      text-align:center;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.75);
+      position:relative;
+      z-index:1;
+    }
+    .moneyItem .coin .inner span{font-size:18px}
+    .moneyItem .coin .inner small{
+      display:block;font-size:10px;font-weight:1000;letter-spacing:.7px;opacity:.9;margin-top:1px;text-transform:uppercase;
+    }
+
+    /* Solid coin colours */
+    .moneyItem .c5 { background:#66f0b2; }
+    .moneyItem .c10{ background:#5ad2ff; }
+    .moneyItem .c20{ background:#ff7abf; }
+    .moneyItem .c50{ background:#ffd25a; }
+
+    /* $1 coin: solid gold octagon */
+    .moneyItem .coinOct{
+      width:74px; height:74px;
+      display:grid; place-items:center;
+      font-weight:1000;
+      border:3px solid rgba(255,255,255,.65);
+      clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+      background:#ffcf4f;
+      position:relative;
+      user-select:none;
+      overflow:hidden;
+      color:#0b1220;
+      box-shadow:0 14px 22px rgba(0,0,0,.22);
+    }
+    .moneyItem .coinOct:before{
+      content:"";
+      position:absolute; inset:0;
+      background: radial-gradient(circle at 28% 25%, rgba(255,255,255,.58), rgba(255,255,255,0) 52%);
+      opacity:.95;
+      pointer-events:none;
+    }
+    .moneyItem .coinOct small{
+      display:block;font-size:10px;font-weight:1000;letter-spacing:.7px;opacity:.9;margin-top:2px;text-transform:uppercase;
+    }
+
+    /* Notes: solid colour cards */
+    .moneyItem .noteCard{
+      width:122px; height:64px;
+      border-radius:18px;
+      border:3px solid rgba(255,255,255,.65);
+      box-shadow:0 14px 22px rgba(0,0,0,.22);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:1000;
+      position:relative;
+      overflow:hidden;
+      user-select:none;
+      color:#0b1220;
+      text-align:center;
+    }
+    .moneyItem .noteCard:before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: radial-gradient(circle at 28% 25%, rgba(255,255,255,.60), rgba(255,255,255,0) 54%);
+      opacity:.95;
+      pointer-events:none;
+    }
+    .moneyItem .noteCard:after{
+      content:"";
+      position:absolute;
+      inset:10px;
+      border-radius:14px;
+      border:2px dashed rgba(0,0,0,.18);
+      opacity:.55;
+      pointer-events:none;
+    }
+    .moneyItem .noteCard .big{
+      font-size:26px;
+      letter-spacing:.5px;
+      text-shadow:0 2px 0 rgba(255,255,255,.35);
+      position:relative; z-index:2;
+    }
+    .moneyItem .noteCard small{
+      display:block;font-size:10px;opacity:.90;letter-spacing:1px;text-transform:uppercase;margin-top:2px;
+      position:relative; z-index:2;
+    }
+
+    /* Solid note colours by value */
+    .moneyItem .note-v2 { background:#ffa64d; }
+    .moneyItem .note-v5 { background:#66f0b2; }
+    .moneyItem .note-v10{ background:#5ad2ff; }
+    .moneyItem .note-v20{ background:#ff7abf; }
+    .moneyItem .note-v50{ background:#b58cff; }
+
+    /* Practice info panels */
+    .practiceHud{
+      margin-top:12px;
+      display:grid;
+      grid-template-columns: 1fr 1fr .6fr;
+      gap:12px;
+    }
+    @media (max-width: 720px){
+      .practiceHud{grid-template-columns:1fr}
+    }
+    .hudBox{
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(0,0,0,.28);
+      box-shadow:0 14px 34px rgba(0,0,0,.26);
+      padding:14px 14px;
+      backdrop-filter: blur(10px);
+    }
+    .hudTitle{
+      font-size:12px;
+      color:rgba(255,255,255,.78);
+      font-weight:1000;
+      letter-spacing:.3px;
+      display:flex;align-items:center;gap:8px;
+      margin:0 0 8px;
+      text-transform:uppercase;
+    }
+    .hudValue{
+      font-size:22px;
+      font-weight:1000;
+      letter-spacing:.2px;
+      line-height:1.1;
+    }
+    .hudValue.mono{font-family:var(--mono)}
+    .hudNote{
+      margin-top:6px;
+      font-size:13px;
+      color:rgba(255,255,255,.72);
+    }
+    .hudBox.now{
+      background:linear-gradient(135deg, rgba(255,79,216,.22), rgba(66,230,255,.18));
+      border-color:rgba(66,230,255,.26);
+    }
+    .hudBox.total{
+      background:linear-gradient(135deg, rgba(104,255,157,.20), rgba(255,210,90,.18));
+      border-color:rgba(104,255,157,.26);
+    }
+
+    /* Quiz UI */
+    .qTop{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+    .meter{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+
+    .answerRow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+    .moneyInput{
+      display:flex;gap:10px;align-items:center;
+      padding:12px 14px;border-radius:18px;border:1px solid var(--line);
+      background:rgba(255,255,255,.08);
+      font-weight:1000;color:var(--ink);
+      box-shadow:0 12px 30px rgba(0,0,0,.18);
+      backdrop-filter: blur(10px);
+    }
+    .moneyInput span{color:rgba(255,255,255,.92);font-size:16px}
+    .moneyInput input{
+      width:160px;
+      padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.18);
+      background:rgba(0,0,0,.28);
+      color:var(--ink);
+      font-weight:1000;
+      font-family:var(--mono);
+      font-size:16px;
+      outline:none;
+    }
+
+    .msg{
+      margin-top:10px;padding:12px 12px;border-radius:18px;border:1px solid var(--line);
+      background:rgba(0,0,0,.26);font-weight:1000;line-height:1.35;
+      display:none;
+    }
+    .msg.good{display:block;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.12)}
+    .msg.bad{display:block;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.12)}
+
+    /* Confetti canvas */
+    #confetti{
+      position:fixed; inset:0;
+      pointer-events:none;
+      z-index:9990;
+    }
+
+    footer{
+      margin-top:18px;
+      color:rgba(255,255,255,.62);
+      font-size:12px;
+      text-align:center;
+      padding:16px 0 8px;
+    }
+
+    .fine{color:rgba(255,255,255,.65);font-size:13px;line-height:1.45;margin-top:10px;}
+    label{display:block;font-size:12px;color:rgba(255,255,255,.70);margin:0 0 6px;font-weight:1000;letter-spacing:.2px;}
+    select, input[type="number"]{
+      width:100%;
+      padding:12px 12px;border-radius:16px;border:1px solid var(--line);
+      background:rgba(255,255,255,.08);
+      color:var(--ink);
+      outline:none;
+      font-weight:1000;
+      box-shadow:0 12px 30px rgba(0,0,0,.18);
+      backdrop-filter: blur(10px);
+    }
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+      margin-top:10px;
+    }
+    .rowBtns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti"></canvas>
+
+  <!-- optional mp3 (fallback is beep) -->
+  <audio id="sndCorrect" src="correct.mp3" preload="auto"></audio>
+  <audio id="sndWrong" src="wrong.mp3" preload="auto"></audio>
+
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <div class="badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 8.5c0-1.38 1.12-2.5 2.5-2.5h11C19.88 6 21 7.12 21 8.5v7c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 18 4 16.88 4 15.5v-7Z" stroke="rgba(255,255,255,.95)" stroke-width="2"/>
+            <path d="M7 10h10M7 14h6" stroke="rgba(255,255,255,.85)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="16.8" cy="14.2" r="2.2" fill="rgba(255,255,255,.22)"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Counting Money (SGD) — Count On</h1>
+          <p class="sub">
+            <b>Practice (Teacher):</b> Press <b>Next</b> to count the <b>highlighted</b> money. The computer reads the <b>running total</b> (shown as <b>$d.cc</b>).<br/>
+            <b>Quiz (Pupil):</b> No reading. Pupils count and type the amount within <b>40 seconds</b>. Format: <b>8</b> or <b>8.00</b> (2 d.p. only — no <b>8.5</b>).
+          </p>
+        </div>
+      </div>
+
+      <div class="topActions">
+        <div class="pill" id="speakPill" title="Voice status (practice only)">
+          <span class="statusDot ready" id="statusDot"></span>
+          <b id="statusText">Ready</b>
+        </div>
+
+        <div class="pill" title="Practice synthetic speech (no voice in quiz)">
+          <input id="ttsToggle" type="checkbox" checked />
+          <span>Practice Read Out</span>
+        </div>
+
+        <button class="btn ghost" id="unlockVoice">🔓 Unlock voice</button>
+
+        <div class="pill" title="Items arranged from biggest to smallest">
+          <span>Big → Small ✅</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Main -->
+      <div class="card">
+        <div class="cardHead">
+          <div class="modeTabs">
+            <div class="tab active" id="tabPractice" role="button" tabindex="0">Teacher Practice</div>
+            <div class="tab" id="tabQuiz" role="button" tabindex="0">Pupil Quiz (10 Q • 40s)</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn ghost" id="btnReset">Reset</button>
+            <button class="btn" id="btnNext">Next</button>
+          </div>
+        </div>
+
+        <!-- PRACTICE -->
+        <div class="cardBody" id="practicePane">
+          <p class="hint">
+            Teacher: press <b>Next</b>. The highlighted item is the one to count now.
+            The computer speaks the running total.
+          </p>
+
+          <div class="moneyRow" id="practiceMoney"></div>
+
+          <div class="practiceHud">
+            <div class="hudBox now">
+              <div class="hudTitle">Now counting</div>
+              <div class="hudValue" id="nowCounting">Press Next</div>
+              <div class="hudNote">Value is shown for practice.</div>
+            </div>
+
+            <div class="hudBox total">
+              <div class="hudTitle">Running total</div>
+              <div class="hudValue mono" id="runningTotal">$0.00</div>
+              <div class="hudNote">Shown as <b>$d.cc</b>.</div>
+            </div>
+
+            <div class="hudBox">
+              <div class="hudTitle">Step</div>
+              <div class="hudValue mono" id="stepBox">0 / 0</div>
+            </div>
+          </div>
+
+          <div class="fine">
+            Practice & quiz use only these denominations: <b>5¢, 10¢, 20¢, 50¢, $1, $2, $5, $10, $50</b>.
+            Items are always arranged <b>biggest → smallest</b>.
+          </div>
+        </div>
+
+        <!-- QUIZ -->
+        <div class="cardBody" id="quizPane" style="display:none">
+          <p class="hint">
+            Pupils: count the money (big → small) and type the final amount within <b>40 seconds</b>.
+            No voice. Correct answer triggers <b>confetti + sound</b>.
+          </p>
+
+          <div class="qTop">
+            <div class="meter">
+              <span class="chipStat" id="qProgressChip"><span class="miniDot"></span>Q 1 / 10</span>
+              <span class="chipStat" id="qScoreChip"><span class="miniDot"></span>Score 0</span>
+              <span class="chipStat" id="qTimeChip"><span class="miniDot"></span>Time 40s</span>
+            </div>
+            <button class="btn ghost" id="btnRestartQuiz" type="button">Restart Quiz</button>
+          </div>
+
+          <div class="moneyRow quizMode" id="quizMoney"></div>
+
+          <div class="answerRow">
+            <div class="moneyInput">
+              <span>$</span>
+              <input id="ans" type="text" inputmode="decimal" placeholder="8 or 8.00" autocomplete="off"/>
+            </div>
+            <button class="btn" id="btnCheck" type="button">Check</button>
+          </div>
+
+          <div class="msg" id="quizMsg"></div>
+
+          <div class="fine">
+            Accepts: <b>8</b> or <b>8.00</b> or <b>8.50</b> (2 d.p. only). Not accepted: <b>8.5</b>.
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Settings -->
+      <div class="card">
+        <div class="cardHead">
+          <h2>Settings</h2>
+          <span class="chipStat"><span class="miniDot"></span>Big → Small ✅</span>
+        </div>
+
+        <div class="cardBody">
+          <div id="practiceControls">
+            <p class="hint" style="margin-bottom:8px">
+              <b>Practice:</b> choose a set, then teacher presses Next (voice reads running total).
+            </p>
+
+            <div class="controls">
+              <div>
+                <label>Practice Set (10 sets)</label>
+                <select id="practiceSelect"></select>
+              </div>
+            </div>
+
+            <div class="rowBtns">
+              <button class="btn ghost" id="btnLoadPractice" type="button">Load Practice</button>
+              <button class="btn ghost" id="btnNew10Practice" type="button">New 10 Practice Sets</button>
+            </div>
+
+            <div class="fine" style="margin-top:10px">
+              Voice preference: tries <b>Microsoft Mark</b>, then <b>Zira</b>, then <b>David</b> (fallback to any English voice).
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,.12);margin:14px 0">
+
+          <div id="quizControls">
+            <p class="hint" style="margin-bottom:8px">
+              <b>Quiz:</b> 10 questions, 40 seconds each, no voice. Correct answer triggers confetti + sound.
+            </p>
+            <div class="rowBtns">
+              <button class="btn ghost" id="btnStartQuiz" type="button">Start / Restart Quiz</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Designed by Lim Kim Sze © 2026</footer>
+  </div>
+
+<script>
+/* =========================================================
+   Strong anti-stutter: lock ALL interactions while speaking
+   ========================================================= */
+let UI_LOCKED = false;
+
+function setStatus(isSpeaking){
+  const dot = document.getElementById("statusDot");
+  const txt = document.getElementById("statusText");
+  if(isSpeaking){
+    dot.classList.remove("ready");
+    dot.classList.add("speaking");
+    txt.textContent = "Speaking…";
+  }else{
+    dot.classList.remove("speaking");
+    dot.classList.add("ready");
+    txt.textContent = "Ready";
+  }
+}
+
+function setUILock(on){
+  UI_LOCKED = !!on;
+  setStatus(UI_LOCKED);
+
+  const els = document.querySelectorAll("button, input, select, textarea");
+  els.forEach(el=>{
+    if(!el.dataset) return;
+    if(UI_LOCKED){
+      if(el.dataset.prevDisabled === undefined){
+        el.dataset.prevDisabled = el.disabled ? "1" : "0";
+      }
+      el.disabled = true;
+    }else{
+      if(el.dataset.prevDisabled !== undefined){
+        el.disabled = (el.dataset.prevDisabled === "1");
+        delete el.dataset.prevDisabled;
+      }
+    }
+  });
+
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach(t=>{
+    if(UI_LOCKED){
+      t.classList.add("locked");
+      t.setAttribute("aria-disabled","true");
+      t.tabIndex = -1;
+    }else{
+      t.classList.remove("locked");
+      t.removeAttribute("aria-disabled");
+      t.tabIndex = 0;
+    }
+  });
+}
+
+function hardBlock(e){
+  if(!UI_LOCKED) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
+}
+["click","pointerdown","pointerup","keydown","keyup","input","change","submit"].forEach(type=>{
+  document.addEventListener(type, hardBlock, true);
+});
+
+/* =========================================================
+   TTS: prefer Microsoft Mark/Zira/David. One utterance only.
+   ========================================================= */
+const TTS = {
+  enabled:true,
+  busy:false,
+  voice:null,
+  rate:0.98,
+  pitch:1,
+  volume:1,
+
+  init(){
+    if(!("speechSynthesis" in window)) return;
+
+    const pickVoice = ()=>{
+      const voices = speechSynthesis.getVoices() || [];
+      const isEnglish = v => /^en/i.test(v.lang || "");
+      const byName = (re) => voices.find(v => isEnglish(v) && re.test(v.name || ""));
+
+      this.voice =
+        byName(/microsoft.*mark/i) ||
+        byName(/microsoft.*zira/i) ||
+        byName(/microsoft.*david/i) ||
+        byName(/mark/i) ||
+        byName(/zira/i) ||
+        byName(/david/i) ||
+        voices.find(isEnglish) ||
+        voices[0] ||
+        null;
+    };
+
+    pickVoice();
+    try{ speechSynthesis.onvoiceschanged = pickVoice; }catch(e){}
+  },
+
+  stop(){
+    if(!("speechSynthesis" in window)) return;
+    try{ speechSynthesis.cancel(); }catch(e){}
+    this.busy=false;
+    setUILock(false);
+  },
+
+  speakOnce(text){
+    if(!this.enabled) return Promise.resolve(false);
+    if(!("speechSynthesis" in window)) return Promise.resolve(false);
+    const t = String(text||"").trim();
+    if(!t) return Promise.resolve(false);
+    if(this.busy) return Promise.resolve(false);
+
+    return new Promise((resolve)=>{
+      try{
+        const u = new SpeechSynthesisUtterance(t);
+        if(this.voice) u.voice = this.voice;
+        u.rate = this.rate;
+        u.pitch = this.pitch;
+        u.volume = this.volume;
+        u.lang = (this.voice && this.voice.lang) ? this.voice.lang : "en-SG";
+
+        this.busy=true;
+        setUILock(true);
+
+        u.onend   = ()=>{ this.busy=false; setUILock(false); resolve(true); };
+        u.onerror = ()=>{ this.busy=false; setUILock(false); resolve(false); };
+
+        speechSynthesis.speak(u);
+      }catch(e){
+        this.busy=false;
+        setUILock(false);
+        resolve(false);
+      }
+    });
+  }
+};
+TTS.init();
+
+document.getElementById("ttsToggle").addEventListener("change", ()=>{
+  if(TTS.busy) return;
+  TTS.enabled = !!document.getElementById("ttsToggle").checked;
+  if(!TTS.enabled) TTS.stop();
+});
+
+document.getElementById("unlockVoice").addEventListener("click", async ()=>{
+  if(TTS.busy) return;
+  await TTS.speakOnce("Voice unlocked.");
+});
+
+/* =========================================================
+   Helpers
+   ========================================================= */
+function fmtMoney(cents){
+  cents = Math.max(0, Math.round(cents));
+  const d = Math.floor(cents/100);
+  const c = cents%100;
+  return `$${d}.${String(c).padStart(2,"0")}`;
+}
+
+/* Strict parse: accepts "8" or "8.00" or "8.50" (2dp only), optional "$". rejects "8.5" */
+function parseMoneyStrict(str){
+  if(str==null) return null;
+  const s = String(str).trim().replace(/\s+/g,"");
+  if(!s) return null;
+
+  const s2 = s.replace(/^\$/,"");
+  if(!/^\d+(\.\d{2})?$/.test(s2)) return null;
+
+  const parts = s2.split(".");
+  const dollars = parseInt(parts[0],10);
+  const cents = (parts.length===2) ? parseInt(parts[1],10) : 0;
+  return dollars*100 + cents;
+}
+
+function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+/* Sort: dollars first, then cents; within each: biggest -> smallest */
+function sortItems(items){
+  return [...items].sort((A,B)=>{
+    const aDollar = (A.value >= 100);
+    const bDollar = (B.value >= 100);
+    if(aDollar !== bDollar) return bDollar - aDollar;
+    return (B.value - A.value);
+  });
+}
+
+/* TTS phrase rules:
+   - If total < $1: "80 cents"
+   - If exact dollars: "17 dollars"
+   - Else: "17 dollars and 35 cents"
+*/
+function sayTotalPhrase(totalCents, isFinal){
+  const d = Math.floor(totalCents/100);
+  const c = totalCents % 100;
+
+  let phrase = "";
+  if(d === 0 && c > 0){
+    phrase = `${c} cents`;
+  }else if(c === 0){
+    phrase = `${d} dollars`;
+  }else{
+    phrase = `${d} dollars and ${c} cents`;
+  }
+
+  if(isFinal){
+    if(d === 0 && c > 0){
+      phrase = `${phrase}. Total amount is ${c} cents.`;
+    }else{
+      phrase = `${phrase}. Total amount is ${d} dollars and ${c} cents.`;
+    }
+  }
+  return phrase;
+}
+
+/* Speak item value (only for FIRST press in practice) */
+function sayItemValue(item){
+  if(item.value >= 100){
+    const d = item.value/100;
+    return `${d} dollars`;
+  }
+  return `${item.value} cents`;
+}
+
+/* =========================================================
+   Money visuals (solid, kid-friendly)
+   ========================================================= */
+function svgCoin(valueCents){
+  if(valueCents >= 100){
+    return `
+      <div class="coinOct">
+        <div style="text-align:center; position:relative; z-index:1">
+          $1
+          <small>SG coin</small>
+        </div>
+      </div>
+    `;
+  }
+
+  const cls = (valueCents===5) ? "c5"
+    : (valueCents===10) ? "c10"
+    : (valueCents===20) ? "c20"
+    : "c50";
+
+  return `
+    <div class="coin ${cls}">
+      <div class="inner">
+        <div>
+          <span>${valueCents}</span>
+          <small>cents</small>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function svgNote(valueDollars){
+  const v = Number(valueDollars)||0;
+  return `
+    <div class="noteCard note-v${v}">
+      <div style="position:relative; z-index:2">
+        <div class="big">$${v}</div>
+        <small>SGD</small>
+      </div>
+    </div>
+  `;
+}
+
+function moneyItemEl(item, state, showBadges=true){
+  const el = document.createElement("div");
+  const isSmallCoin = (item.kind==="coin" && item.value < 100);
+  el.className =
+    "moneyItem" +
+    (isSmallCoin ? " small" : "") +
+    (state==="dim" ? " dim" : "") +
+    (state==="highlight" ? " highlight" : "") +
+    (state==="counted" ? " counted" : "");
+
+  const body = (item.kind==="coin")
+    ? svgCoin(item.value)
+    : svgNote(item.value/100);
+
+  const labelHtml = showBadges ? `<div class="label">${item.display}</div>` : ``;
+  const kindHtml  = showBadges ? `<div class="kind">${item.kind.toUpperCase()}</div>` : ``;
+
+  el.innerHTML = `${labelHtml}${kindHtml}${body}`;
+  return el;
+}
+
+/* =========================================================
+   Confetti (robust)
+   ========================================================= */
+const confettiCanvas = document.getElementById("confetti");
+const cctx = confettiCanvas.getContext ? confettiCanvas.getContext("2d") : null;
+let confettiBits = [];
+let confettiRAF = null;
+
+function resizeConfetti(){
+  if(!cctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  confettiCanvas.style.width = w + "px";
+  confettiCanvas.style.height = h + "px";
+  confettiCanvas.width = Math.floor(w * dpr);
+  confettiCanvas.height = Math.floor(h * dpr);
+
+  cctx.setTransform(dpr,0,0,dpr,0,0);
+  cctx.clearRect(0,0,w,h);
+}
+window.addEventListener("resize", resizeConfetti);
+resizeConfetti();
+
+function launchConfetti(){
+  if(!cctx) return;
+
+  if(confettiRAF) cancelAnimationFrame(confettiRAF);
+  confettiRAF = null;
+
+  const W = window.innerWidth, H = window.innerHeight;
+  confettiBits = [];
+
+  const n = 190;
+  for(let i=0;i<n;i++){
+    confettiBits.push({
+      x: W*0.50 + (Math.random()*260-130),
+      y: H*0.20 + (Math.random()*90-45),
+      vx: (Math.random()*2-1) * (4 + Math.random()*5),
+      vy: -(7 + Math.random()*10),
+      g: 0.22 + Math.random()*0.20,
+      w: 4 + Math.random()*7,
+      h: 4 + Math.random()*12,
+      a: Math.random()*Math.PI*2,
+      va: (Math.random()*2-1)*0.20,
+      hue: Math.random()*360
+    });
+  }
+
+  const start = performance.now();
+  const dur = 1500;
+
+  function frame(t){
+    const elapsed = t - start;
+    cctx.clearRect(0,0,W,H);
+
+    for(const p of confettiBits){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.g;
+      p.a += p.va;
+
+      cctx.save();
+      cctx.translate(p.x, p.y);
+      cctx.rotate(p.a);
+      cctx.fillStyle = `hsla(${(p.hue + elapsed*0.08)%360}, 92%, 68%, .95)`;
+      cctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      cctx.restore();
+    }
+
+    if(elapsed < dur){
+      confettiRAF = requestAnimationFrame(frame);
+    }else{
+      cctx.clearRect(0,0,W,H);
+      confettiRAF = null;
+    }
+  }
+
+  confettiRAF = requestAnimationFrame(frame);
+}
+
+/* =========================================================
+   Sound (mp3 if available, else WebAudio beep)
+   ========================================================= */
+let audioCtx = null;
+function ensureAudio(){
+  try{
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === "suspended") audioCtx.resume();
+  }catch(e){}
+}
+document.addEventListener("pointerdown", ensureAudio, {once:true, capture:true});
+
+function playAudio(el){
+  ensureAudio();
+  if(!el) return false;
+  try{
+    el.currentTime = 0;
+    const p = el.play();
+    if(p && typeof p.catch === "function") p.catch(()=>{});
+    return true;
+  }catch(e){ return false; }
+}
+
+function beepGood(){
+  ensureAudio();
+  if(!audioCtx) return;
+  try{
+    const o1 = audioCtx.createOscillator();
+    const o2 = audioCtx.createOscillator();
+    const g  = audioCtx.createGain();
+
+    o1.type="sine";     o2.type="triangle";
+    o1.frequency.value = 880;
+    o2.frequency.value = 660;
+
+    g.gain.value = 0.0001;
+
+    o1.connect(g); o2.connect(g);
+    g.connect(audioCtx.destination);
+
+    const t0 = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.12, t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.18);
+
+    o1.start(t0); o2.start(t0);
+    o1.stop(t0+0.20); o2.stop(t0+0.20);
+  }catch(e){}
+}
+
+function beepBad(){
+  ensureAudio();
+  if(!audioCtx) return;
+  try{
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type="square";
+    o.frequency.value = 180;
+    g.gain.value = 0.0001;
+
+    o.connect(g);
+    g.connect(audioCtx.destination);
+
+    const t0 = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.10, t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.22);
+
+    o.start(t0);
+    o.stop(t0+0.24);
+  }catch(e){}
+}
+
+function sfxCorrect(){
+  const ok = playAudio(document.getElementById("sndCorrect"));
+  if(!ok) beepGood();
+}
+function sfxWrong(){
+  const ok = playAudio(document.getElementById("sndWrong"));
+  if(!ok) beepBad();
+}
+
+/* =========================================================
+   Build random sets (Practice + Quiz)
+   ========================================================= */
+function buildItemsFromValues(valuesCents){
+  let id = 0;
+  const items = valuesCents.map(v=>{
+    if(v >= 100){
+      if(v === 100){
+        return { id:`m${id++}`, kind:"coin", value:100, display:"$1" };
+      }else{
+        return { id:`m${id++}`, kind:"note", value:v, display:`$${v/100}` };
+      }
+    }else{
+      return { id:`m${id++}`, kind:"coin", value:v, display:`${v}¢` };
+    }
+  });
+  return sortItems(items);
+}
+
+function randomPracticeSet(){
+  const notes = [5000,1000,500,200]; // $50,$10,$5,$2
+  const cents = [50,20,10,5];
+
+  const nNotes = randInt(1,3);
+  const nCents = randInt(2,5);
+  const includeDollarCoin = (Math.random() < 0.55) ? 1 : 0;
+
+  const values = [];
+  for(let i=0;i<nNotes;i++) values.push(pick(notes));
+  if(includeDollarCoin) values.push(100);
+  for(let i=0;i<nCents;i++) values.push(pick(cents));
+
+  if(!values.some(v=>v>=100)) values.push(200);
+
+  return buildItemsFromValues(values);
+}
+
+function summarizeSet(items){
+  const parts = items.map(it=>{
+    if(it.value>=100){
+      if(it.value===100) return "$1";
+      return `$${it.value/100}`;
+    }
+    return `${it.value}¢`;
+  });
+  return parts.join("+");
+}
+
+function generatePracticeSets(n=10){
+  const sets = [];
+  const seen = new Set();
+  let guard = 0;
+  while(sets.length < n && guard < 2000){
+    guard++;
+    const items = randomPracticeSet();
+    const sig = items.map(x=>`${x.kind}:${x.value}`).join("|");
+    if(seen.has(sig)) continue;
+    seen.add(sig);
+    sets.push(items);
+  }
+  return sets;
+}
+
+function randomQuizQuestion(){
+  const notes = [5000,1000,500,200];
+  const cents = [50,20,10,5];
+
+  const nNotes = randInt(1,3);
+  const nDollarCoin = (Math.random() < 0.65) ? randInt(0,1) : 0;
+  const nCents = randInt(2,6);
+
+  const values = [];
+  for(let i=0;i<nNotes;i++) values.push(pick(notes));
+  for(let i=0;i<nDollarCoin;i++) values.push(100);
+  for(let i=0;i<nCents;i++) values.push(pick(cents));
+
+  if(!values.some(v=>v>=100)) values.push(pick([200,500,1000]));
+
+  const items = buildItemsFromValues(values);
+  const answerCents = items.reduce((s,it)=>s+it.value,0);
+  return { items, answerCents };
+}
+
+/* =========================================================
+   PRACTICE logic
+   FIXED per your instruction:
+   - Press 1: read FIRST note value; keep first note highlighted
+   - Press 2: highlight SECOND note and read running total (after adding it)
+   - During speaking: keep the counted item highlighted
+   ========================================================= */
+let PRACTICE_SETS = generatePracticeSets(10);
+let practiceIndex = 0;
+let practiceStep = 0;                 // how many items have been counted
+let practiceItems = PRACTICE_SETS[0];
+
+let practiceHoldFirst = false;        // keep 1st highlighted after press 1
+let practiceHighlightOverride = null; // keep current counted item highlighted while speaking
+
+const practiceMoney = document.getElementById("practiceMoney");
+const nowCountingEl = document.getElementById("nowCounting");
+const runningTotalEl = document.getElementById("runningTotal");
+const stepBoxEl = document.getElementById("stepBox");
+
+function practiceOrder(items){ return items.map(x=>x.id); }
+
+function practiceTotals(items, doneCount){
+  const order = practiceOrder(items);
+  let total = 0;
+  for(let i=0;i<doneCount;i++){
+    const it = items.find(x=>x.id===order[i]);
+    if(it) total += it.value;
+  }
+  return { totalCents: total, order };
+}
+
+function renderPractice(){
+  practiceMoney.innerHTML = "";
+
+  const { order } = practiceTotals(practiceItems, 0);
+  const totalSteps = order.length;
+
+  // Highlight selection (priority):
+  // 1) override (during speech)
+  // 2) hold first after 1st press
+  // 3) normal next-to-count
+  let highlightId = null;
+  if(practiceHighlightOverride !== null && practiceHighlightOverride < totalSteps){
+    highlightId = order[practiceHighlightOverride];
+  }else if(practiceHoldFirst && practiceStep === 1){
+    highlightId = order[0];
+  }else if(practiceStep < totalSteps){
+    highlightId = order[practiceStep];
+  }
+
+  practiceItems.forEach(it=>{
+    const idx = order.indexOf(it.id);
+    let state = "dim";
+    if(it.id === highlightId) state = "highlight";
+    else if(idx < practiceStep) state = "counted";
+    else state = "dim";
+
+    practiceMoney.appendChild(moneyItemEl(it, state, true));
+  });
+
+  const total = practiceTotals(practiceItems, practiceStep).totalCents;
+  runningTotalEl.textContent = fmtMoney(total);
+  stepBoxEl.textContent = `${practiceStep} / ${totalSteps}`;
+
+  if(highlightId){
+    const it = practiceItems.find(x=>x.id===highlightId);
+    nowCountingEl.textContent = it ? it.display.replace("¢"," cents") : "Press Next";
+  }else{
+    nowCountingEl.textContent = (practiceStep >= totalSteps) ? "Done!" : "Press Next";
+  }
+}
+
+async function practiceNext(){
+  if(UI_LOCKED || (TTS.enabled && TTS.busy)) return;
+
+  const { order } = practiceTotals(practiceItems, 0);
+  const totalSteps = order.length;
+
+  if(practiceStep >= totalSteps){
+    practiceStep = 0;
+    practiceHoldFirst = false;
+    practiceHighlightOverride = null;
+    renderPractice();
+    document.getElementById("btnNext").textContent = "Next";
+    return;
+  }
+
+  const idxToCount = practiceStep; // next uncounted index
+  const currentItem = practiceItems.find(x=>x.id===order[idxToCount]);
+  const doneCount = practiceStep + 1;
+  const { totalCents } = practiceTotals(practiceItems, doneCount);
+
+  // ✅ show the counted item highlighted while speaking
+  practiceHighlightOverride = idxToCount;
+
+  // ✅ after first press, keep first item highlighted (until next press)
+  practiceHoldFirst = (doneCount === 1);
+
+  // Update totals (count it)
+  practiceStep = doneCount;
+  renderPractice();
+
+  if(TTS.enabled){
+    const isFinal = (doneCount >= totalSteps);
+    const phrase = (doneCount === 1 && currentItem)
+      ? sayItemValue(currentItem)          // press 1
+      : sayTotalPhrase(totalCents, isFinal); // press 2 onwards
+    await TTS.speakOnce(phrase);
+  }
+
+  // After speech: remove override; (holdFirst may keep first highlighted)
+  practiceHighlightOverride = null;
+  renderPractice();
+
+  document.getElementById("btnNext").textContent = (practiceStep >= totalSteps) ? "Restart" : "Next";
+}
+
+function practiceReset(){
+  if(UI_LOCKED || (TTS.enabled && TTS.busy)) return;
+  practiceStep = 0;
+  practiceHoldFirst = false;
+  practiceHighlightOverride = null;
+  renderPractice();
+  document.getElementById("btnNext").textContent = "Next";
+}
+
+function loadPractice(idx){
+  practiceIndex = idx;
+  practiceItems = PRACTICE_SETS[idx] || PRACTICE_SETS[0];
+  practiceStep = 0;
+  practiceHoldFirst = false;
+  practiceHighlightOverride = null;
+  renderPractice();
+  document.getElementById("btnNext").textContent = "Next";
+}
+
+function rebuildPracticeDropdown(){
+  const sel = document.getElementById("practiceSelect");
+  sel.innerHTML = "";
+  PRACTICE_SETS.forEach((items,i)=>{
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = `Practice ${i+1} — ${summarizeSet(items)}`;
+    sel.appendChild(opt);
+  });
+  sel.value = String(practiceIndex);
+}
+
+/* =========================================================
+   QUIZ logic (10 questions, 40s each, no voice)
+   FIXED: timer always starts and ticks down properly
+   ========================================================= */
+const quizMoney = document.getElementById("quizMoney");
+const qProgressChip = document.getElementById("qProgressChip");
+const qScoreChip = document.getElementById("qScoreChip");
+const qTimeChip = document.getElementById("qTimeChip");
+const quizMsg = document.getElementById("quizMsg");
+const ansEl = document.getElementById("ans");
+
+let quiz = {
+  total: 10,
+  idx: 0,
+  score: 0,
+  questions: [],
+  firstWrong: new Set(),
+  secondsLeft: 40,
+  timer: null,
+  doneThisQ: false
+};
+
+function renderQuiz(){
+  const q = quiz.questions[quiz.idx];
+  quizMoney.innerHTML = "";
+  q.items.forEach(it=>{
+    quizMoney.appendChild(moneyItemEl(it, "dim", false));
+  });
+
+  qProgressChip.innerHTML = `<span class="miniDot"></span>Q ${quiz.idx+1} / ${quiz.total}`;
+  qScoreChip.innerHTML = `<span class="miniDot"></span>Score ${quiz.score}`;
+  qTimeChip.innerHTML = `<span class="miniDot"></span>Time ${quiz.secondsLeft}s`;
+
+  quizMsg.className = "msg";
+  quizMsg.style.display = "none";
+
+  ansEl.value = "";
+  ansEl.focus();
+  quiz.doneThisQ = false;
+
+  document.getElementById("btnNext").disabled = true;
+  document.getElementById("btnNext").textContent = "Next";
+}
+
+function stopTimer(){
+  if(quiz.timer){
+    clearInterval(quiz.timer);
+    quiz.timer = null;
+  }
+}
+
+function startTimer(){
+  stopTimer();
+  quiz.secondsLeft = 40;
+  qTimeChip.innerHTML = `<span class="miniDot"></span>Time ${quiz.secondsLeft}s`;
+
+  quiz.timer = setInterval(()=>{
+    // If user leaves quiz mode, stop cleanly (prevents "timer did not set off" edge cases)
+    if(mode !== "quiz"){
+      stopTimer();
+      return;
+    }
+    if(quiz.doneThisQ) return;
+
+    quiz.secondsLeft--;
+    qTimeChip.innerHTML = `<span class="miniDot"></span>Time ${quiz.secondsLeft}s`;
+
+    if(quiz.secondsLeft <= 0){
+      timeUp();
+    }
+  }, 1000);
+}
+
+function timeUp(){
+  stopTimer();
+  quiz.doneThisQ = true;
+
+  if(!quiz.firstWrong.has(quiz.idx)) quiz.firstWrong.add(quiz.idx);
+
+  const q = quiz.questions[quiz.idx];
+  quizMsg.className = "msg bad";
+  quizMsg.style.display = "block";
+  quizMsg.innerHTML = `Time’s up ⏰ Answer is <b>${fmtMoney(q.answerCents)}</b>.`;
+
+  document.getElementById("btnNext").disabled = false;
+
+  setTimeout(()=>{ if(mode==="quiz") nextQuestion(); }, 1600);
+}
+
+function checkAnswer(){
+  if(mode!=="quiz") return;
+  if(quiz.doneThisQ) return;
+
+  const q = quiz.questions[quiz.idx];
+  const val = parseMoneyStrict(ansEl.value);
+
+  if(val === null){
+    quizMsg.className = "msg bad";
+    quizMsg.style.display = "block";
+    quizMsg.textContent = "Type like 8 or 8.00 (2 d.p. only).";
+    sfxWrong();
+    return;
+  }
+
+  if(val === q.answerCents){
+    stopTimer();
+    quiz.doneThisQ = true;
+
+    const firstWasWrong = quiz.firstWrong.has(quiz.idx);
+    if(!firstWasWrong){
+      quiz.score++;
+      qScoreChip.innerHTML = `<span class="miniDot"></span>Score ${quiz.score}`;
+    }
+
+    quizMsg.className = "msg good";
+    quizMsg.style.display = "block";
+    quizMsg.innerHTML = firstWasWrong
+      ? `Correct ✅ (First try was wrong → 0 mark for this question.)`
+      : `Correct ✅ Great job!`;
+
+    launchConfetti();
+    sfxCorrect();
+
+    document.getElementById("btnNext").disabled = false;
+
+    setTimeout(()=>{ if(mode==="quiz") nextQuestion(); }, 1300);
+    return;
+  }
+
+  if(!quiz.firstWrong.has(quiz.idx)) quiz.firstWrong.add(quiz.idx);
+  quizMsg.className = "msg bad";
+  quizMsg.style.display = "block";
+  quizMsg.textContent = "Not correct ❌ Try again.";
+  sfxWrong();
+}
+
+function nextQuestion(){
+  if(mode!=="quiz") return;
+
+  if(quiz.idx < quiz.total - 1){
+    quiz.idx++;
+    quiz.doneThisQ = false;
+    quiz.secondsLeft = 40;
+    renderQuiz();
+    startTimer();
+    return;
+  }
+
+  stopTimer();
+  quizMoney.innerHTML = "";
+  quizMsg.className = "msg good";
+  quizMsg.style.display = "block";
+  quizMsg.innerHTML = `Quiz complete 🎉<br/>Final score: <b>${quiz.score} / ${quiz.total}</b>`;
+  document.getElementById("btnNext").disabled = true;
+}
+
+function startQuiz(){
+  stopTimer();
+  quiz.total = 10;
+  quiz.idx = 0;
+  quiz.score = 0;
+  quiz.firstWrong = new Set();
+  quiz.questions = [];
+  quiz.doneThisQ = false;
+
+  const seen = new Set();
+  let guard = 0;
+  while(quiz.questions.length < quiz.total && guard < 2500){
+    guard++;
+    const q = randomQuizQuestion();
+    const sig = q.items.map(x=>`${x.kind}:${x.value}`).join("|");
+    if(seen.has(sig)) continue;
+    seen.add(sig);
+    quiz.questions.push(q);
+  }
+
+  quiz.total = quiz.questions.length || 10;
+  quiz.secondsLeft = 40;
+  renderQuiz();
+  startTimer();
+}
+
+/* =========================================================
+   UI wiring
+   ========================================================= */
+let mode = "practice";
+
+const tabPractice = document.getElementById("tabPractice");
+const tabQuiz = document.getElementById("tabQuiz");
+const practicePane = document.getElementById("practicePane");
+const quizPane = document.getElementById("quizPane");
+
+function setMode(m){
+  if(UI_LOCKED || (TTS.enabled && TTS.busy)) return;
+
+  mode = m;
+
+  tabPractice.classList.toggle("active", m==="practice");
+  tabQuiz.classList.toggle("active", m==="quiz");
+
+  practicePane.style.display = (m==="practice") ? "" : "none";
+  quizPane.style.display = (m==="quiz") ? "" : "none";
+
+  document.getElementById("btnNext").disabled = false;
+  document.getElementById("btnNext").textContent = "Next";
+
+  if(m==="practice"){
+    stopTimer();
+    practiceReset();
+  }else{
+    startQuiz();
+  }
+}
+
+tabPractice.addEventListener("click", ()=>setMode("practice"));
+tabQuiz.addEventListener("click", ()=>setMode("quiz"));
+
+document.getElementById("btnNext").addEventListener("click", async ()=>{
+  if(mode==="practice"){
+    await practiceNext();
+    return;
+  }
+  if(!quiz.doneThisQ) return;
+  nextQuestion();
+});
+
+document.getElementById("btnReset").addEventListener("click", ()=>{
+  if(mode==="practice") practiceReset();
+  else startQuiz();
+});
+
+document.getElementById("btnCheck").addEventListener("click", checkAnswer);
+ansEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") checkAnswer(); });
+
+document.getElementById("btnRestartQuiz").addEventListener("click", ()=>{
+  if(mode==="quiz") startQuiz();
+});
+document.getElementById("btnStartQuiz").addEventListener("click", ()=>{
+  setMode("quiz");
+});
+
+document.getElementById("btnLoadPractice").addEventListener("click", ()=>{
+  if(UI_LOCKED || (TTS.enabled && TTS.busy)) return;
+  const idx = parseInt(document.getElementById("practiceSelect").value||"0",10);
+  loadPractice(idx);
+});
+
+document.getElementById("btnNew10Practice").addEventListener("click", ()=>{
+  if(UI_LOCKED || (TTS.enabled && TTS.busy)) return;
+  PRACTICE_SETS = generatePracticeSets(10);
+  practiceIndex = 0;
+  rebuildPracticeDropdown();
+  loadPractice(0);
+});
+
+document.getElementById("practiceSelect").addEventListener("change", ()=>{
+  if(UI_LOCKED || (TTS.enabled && TTS.busy)) return;
+  const idx = parseInt(document.getElementById("practiceSelect").value||"0",10);
+  loadPractice(idx);
+});
+
+/* Init */
+(function init(){
+  rebuildPracticeDropdown();
+  loadPractice(0);
+  setMode("practice");
+  renderPractice();
+})();
+</script>
+</body>
+</html>
