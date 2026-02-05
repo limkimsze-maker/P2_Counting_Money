@@ -842,7 +842,7 @@ function hardBlock(e){
 });
 
 /* =========================================================
-   TTS: mobile-friendly prime + robust onend handling
+   TTS: mobile-friendly prime + CHUNKING (prevents cut-off)
    ========================================================= */
 const TTS = {
   enabled:true,
@@ -854,6 +854,7 @@ const TTS = {
 
   primed:false,
   _voicesReady:false,
+  _token:0, // ✅ invalidate in-flight speech chains
 
   _pickVoice(){
     if(!("speechSynthesis" in window)) return false;
@@ -923,9 +924,80 @@ const TTS = {
 
   stop(){
     if(!("speechSynthesis" in window)) return;
+    this._token++; // ✅ invalidate any in-flight speech chain
     try{ speechSynthesis.cancel(); }catch(e){}
     this.busy=false;
     setUILock(false);
+  },
+
+  // ✅ Safari-safe chunking (no regex lookbehind)
+  _chunkText(text, maxLen=120){
+    const t = String(text||"").trim().replace(/\s+/g," ");
+    if(!t) return [];
+
+    // Split into sentence-ish parts by scanning punctuation boundaries.
+    const parts = [];
+    let start = 0;
+    const isPunct = (ch)=> (ch==="."||ch==="!"||ch==="?"||ch===";"||ch===":");
+    for(let i=0;i<t.length;i++){
+      const ch = t[i];
+      if(isPunct(ch)){
+        const next = (i+1 < t.length) ? t[i+1] : "";
+        if(i === t.length-1 || next === " "){
+          const seg = t.slice(start, i+1).trim();
+          if(seg) parts.push(seg);
+          start = i+1;
+        }
+      }
+    }
+    const tail = t.slice(start).trim();
+    if(tail) parts.push(tail);
+
+    if(!parts.length) parts.push(t);
+
+    // Pack parts into chunks <= maxLen, word-splitting if needed
+    const chunks = [];
+    let buf = "";
+
+    const pushBuf = ()=>{
+      const s = buf.trim();
+      if(s) chunks.push(s);
+      buf = "";
+    };
+
+    for(const p0 of parts){
+      const p = p0.trim();
+      if(!p) continue;
+
+      const cand = buf ? (buf + " " + p) : p;
+      if(cand.length <= maxLen){
+        buf = cand;
+        continue;
+      }
+
+      pushBuf();
+
+      if(p.length <= maxLen){
+        buf = p;
+        continue;
+      }
+
+      // split long part by words
+      let wbuf = "";
+      for(const w of p.split(/\s+/)){
+        const wcand = wbuf ? (wbuf + " " + w) : w;
+        if(wcand.length <= maxLen){
+          wbuf = wcand;
+        }else{
+          if(wbuf.trim()) chunks.push(wbuf.trim());
+          wbuf = w;
+        }
+      }
+      if(wbuf.trim()) chunks.push(wbuf.trim());
+    }
+
+    pushBuf();
+    return chunks.length ? chunks : [t];
   },
 
   speakOnce(text){
@@ -935,51 +1007,81 @@ const TTS = {
     // Mobile reliability: prime on first user interaction
     this.prime();
 
-    const t = String(text||"").trim();
+    const t = String(text||"").trim().replace(/\s+/g," ");
     if(!t) return Promise.resolve(false);
     if(this.busy) return Promise.resolve(false);
 
     // Refresh voice if needed
     if(!this._voicesReady) this._pickVoice();
 
+    const myToken = ++this._token;
+
     return new Promise((resolve)=>{
       let finished = false;
       const done = (ok)=>{
         if(finished) return;
         finished = true;
-        this.busy=false;
+        this.busy = false;
         setUILock(false);
         resolve(ok);
       };
 
-      try{
-        // Clear any queued speech (mobile queue can behave oddly)
-        try{ speechSynthesis.cancel(); }catch(e){}
+      const speakChunk = (chunk)=> new Promise((res)=>{
+        if(myToken !== this._token) return res(false);
+        try{
+          const u = new SpeechSynthesisUtterance(chunk);
+          if(this.voice) u.voice = this.voice;
+          u.rate = this.rate;
+          u.pitch = this.pitch;
+          u.volume = this.volume;
+          u.lang = (this.voice && this.voice.lang) ? this.voice.lang : "en-SG";
 
-        const u = new SpeechSynthesisUtterance(t);
-        if(this.voice) u.voice = this.voice;
-        u.rate = this.rate;
-        u.pitch = this.pitch;
-        u.volume = this.volume;
-        u.lang = (this.voice && this.voice.lang) ? this.voice.lang : "en-SG";
+          let ended = false;
+          const finish = (ok)=>{
+            if(ended) return;
+            ended = true;
+            res(ok);
+          };
 
-        this.busy=true;
-        setUILock(true);
+          // Per-chunk safety (prevents long cut-offs)
+          const safetyMs = Math.max(4500, Math.min(25000, 1200 + chunk.length * 170));
+          const safety = setTimeout(()=>{
+            try{ speechSynthesis.cancel(); }catch(e){}
+            finish(false);
+          }, safetyMs);
 
-        // Safety timeout (some mobile browsers occasionally miss onend)
-        const maxMs = Math.max(2500, Math.min(9000, 600 + t.length*70));
-        const safety = setTimeout(()=>{
+          u.onend = ()=>{ clearTimeout(safety); finish(true); };
+          u.onerror = ()=>{ clearTimeout(safety); finish(false); };
+
+          speechSynthesis.speak(u);
+        }catch(e){
+          res(false);
+        }
+      });
+
+      (async ()=>{
+        try{
+          // Clear any queued speech first
           try{ speechSynthesis.cancel(); }catch(e){}
+
+          this.busy = true;
+          setUILock(true);
+
+          const chunks = this._chunkText(t, 120);
+          let allOk = true;
+
+          for(const ch of chunks){
+            if(myToken !== this._token){ allOk = false; break; }
+            const ok = await speakChunk(ch);
+            if(!ok){ allOk = false; break; }
+            await new Promise(r=>setTimeout(r, 60)); // small gap helps prevent boundary clipping
+          }
+
+          done(allOk);
+        }catch(e){
           done(false);
-        }, maxMs);
-
-        u.onend = ()=>{ clearTimeout(safety); done(true); };
-        u.onerror = ()=>{ clearTimeout(safety); done(false); };
-
-        speechSynthesis.speak(u);
-      }catch(e){
-        done(false);
-      }
+        }
+      })();
     });
   }
 };
