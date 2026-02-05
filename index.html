@@ -61,12 +61,19 @@
     }
 
     *{box-sizing:border-box}
+
+    button, .tab, input, select{
+      touch-action: manipulation;
+    }
+
     body{
       margin:0;
       font-family:var(--font);
       color:var(--ink);
       min-height:100vh;
       overflow-x:hidden;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
       background:
         radial-gradient(1200px 700px at 15% 10%, rgba(66,230,255,.22), transparent 60%),
         radial-gradient(900px 600px at 85% 20%, rgba(255,79,216,.18), transparent 60%),
@@ -524,8 +531,76 @@
       margin-top:10px;
     }
     .rowBtns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+
+    /* ================================
+       Mobile-friendly layout tweaks
+       ================================ */
+    @media (max-width: 560px){
+      .wrap{ padding:14px 10px 86px; }
+
+      header{
+        flex-direction:column;
+        align-items:stretch;
+        gap:12px;
+      }
+
+      .title{ align-items:flex-start; }
+      .badge{ width:44px;height:44px;border-radius:16px; }
+      .badge svg{ width:26px;height:26px; }
+
+      h1{ font-size:clamp(20px, 5.6vw, 26px); }
+      .sub{ font-size:13px; }
+
+      .topActions{ width:100%; justify-content:flex-start; }
+      .pill{ width:100%; justify-content:space-between; }
+      #unlockVoice{ width:100%; }
+
+      .grid{ grid-template-columns:1fr; gap:12px; }
+
+      .cardHead{
+        flex-direction:column;
+        align-items:stretch;
+        gap:10px;
+      }
+
+      .modeTabs{ width:100%; }
+      .tab{ flex:1; text-align:center; }
+
+      .mainBtns{
+        width:100%;
+        display:flex;
+        gap:10px;
+        flex-wrap:nowrap;
+      }
+      .mainBtns .btn{ flex:1; }
+
+      .moneyRow{ gap:10px; }
+
+      .moneyItem{ width:124px; height:86px; border-radius:18px; }
+      .moneyItem.small{ width:98px; height:80px; }
+
+      .moneyItem .noteCard{ width:108px; height:58px; border-radius:16px; }
+      .moneyItem .noteCard .big{ font-size:22px; }
+
+      .moneyItem .coin{ width:62px; height:62px; }
+      .moneyItem .coin .inner{ width:48px; height:48px; }
+      .moneyItem .coin .inner span{ font-size:16px; }
+
+      .moneyItem .coinOct{ width:66px; height:66px; }
+
+      .answerRow{ align-items:stretch; }
+      .moneyInput{ width:100%; flex:1; }
+      .moneyInput input{ width:min(240px, 56vw); }
+      #btnCheck{ flex:1; }
+    }
+
+    @media (max-width: 380px){
+      .moneyItem{ width:112px; height:82px; }
+      .moneyItem.small{ width:92px; height:76px; }
+      .moneyItem .noteCard{ width:98px; height:56px; }
+      .moneyItem .noteCard .big{ font-size:20px; }
+    }
   </style>
-  <script src="https://cdn.counter.dev/script.js" data-id="825e93b6-ce99-40ef-8bcc-125f13297433" data-utcoffset="8"></script>
 </head>
 
 <body>
@@ -581,7 +656,7 @@
             <div class="tab active" id="tabPractice" role="button" tabindex="0">Teacher Practice</div>
             <div class="tab" id="tabQuiz" role="button" tabindex="0">Pupil Quiz (10 Q • 40s)</div>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div class="mainBtns">
             <button class="btn ghost" id="btnReset">Reset</button>
             <button class="btn" id="btnNext">Next</button>
           </div>
@@ -762,12 +837,12 @@ function hardBlock(e){
   e.stopPropagation();
   e.stopImmediatePropagation();
 }
-["click","pointerdown","pointerup","keydown","keyup","input","change","submit"].forEach(type=>{
+["click","pointerdown","pointerup","keydown","keyup","input","change","submit","touchend"].forEach(type=>{
   document.addEventListener(type, hardBlock, true);
 });
 
 /* =========================================================
-   TTS: prefer Microsoft Mark/Zira/David. One utterance only.
+   TTS: mobile-friendly prime + robust onend handling
    ========================================================= */
 const TTS = {
   enabled:true,
@@ -777,28 +852,73 @@ const TTS = {
   pitch:1,
   volume:1,
 
+  primed:false,
+  _voicesReady:false,
+
+  _pickVoice(){
+    if(!("speechSynthesis" in window)) return false;
+    const voices = speechSynthesis.getVoices() || [];
+    if(!voices.length) return false;
+
+    const isEnglish = v => /^en/i.test(v.lang || "");
+    const byName = (re) => voices.find(v => isEnglish(v) && re.test(v.name || ""));
+
+    this.voice =
+      byName(/microsoft.*mark/i) ||
+      byName(/microsoft.*zira/i) ||
+      byName(/microsoft.*david/i) ||
+      byName(/mark/i) ||
+      byName(/zira/i) ||
+      byName(/david/i) ||
+      voices.find(isEnglish) ||
+      voices[0] ||
+      null;
+
+    this._voicesReady = true;
+    return true;
+  },
+
   init(){
     if(!("speechSynthesis" in window)) return;
 
-    const pickVoice = ()=>{
-      const voices = speechSynthesis.getVoices() || [];
-      const isEnglish = v => /^en/i.test(v.lang || "");
-      const byName = (re) => voices.find(v => isEnglish(v) && re.test(v.name || ""));
+    const pick = ()=>{ this._pickVoice(); };
 
-      this.voice =
-        byName(/microsoft.*mark/i) ||
-        byName(/microsoft.*zira/i) ||
-        byName(/microsoft.*david/i) ||
-        byName(/mark/i) ||
-        byName(/zira/i) ||
-        byName(/david/i) ||
-        voices.find(isEnglish) ||
-        voices[0] ||
-        null;
-    };
+    // Try immediately
+    pick();
 
-    pickVoice();
-    try{ speechSynthesis.onvoiceschanged = pickVoice; }catch(e){}
+    // Some mobile browsers load voices late
+    let tries = 0;
+    const poll = setInterval(()=>{
+      tries++;
+      if(this._pickVoice() || tries >= 12) clearInterval(poll);
+    }, 250);
+
+    try{ speechSynthesis.onvoiceschanged = pick; }catch(e){}
+  },
+
+  // Prime/unlock speech on mobile (requires a user gesture)
+  prime(){
+    if(this.primed) return;
+    this.primed = true;
+
+    if(!("speechSynthesis" in window)) return;
+
+    try{
+      this._pickVoice();
+      try{ speechSynthesis.cancel(); }catch(e){}
+
+      // Tiny silent utterance helps unlock iOS Safari speech
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      u.rate = 1;
+      u.pitch = 1;
+      u.lang = (this.voice && this.voice.lang) ? this.voice.lang : "en-SG";
+
+      speechSynthesis.speak(u);
+
+      // Cancel quickly; still counts as "gesture unlock" on many mobile browsers
+      setTimeout(()=>{ try{ speechSynthesis.cancel(); }catch(e){} }, 20);
+    }catch(e){}
   },
 
   stop(){
@@ -811,12 +931,31 @@ const TTS = {
   speakOnce(text){
     if(!this.enabled) return Promise.resolve(false);
     if(!("speechSynthesis" in window)) return Promise.resolve(false);
+
+    // Mobile reliability: prime on first user interaction
+    this.prime();
+
     const t = String(text||"").trim();
     if(!t) return Promise.resolve(false);
     if(this.busy) return Promise.resolve(false);
 
+    // Refresh voice if needed
+    if(!this._voicesReady) this._pickVoice();
+
     return new Promise((resolve)=>{
+      let finished = false;
+      const done = (ok)=>{
+        if(finished) return;
+        finished = true;
+        this.busy=false;
+        setUILock(false);
+        resolve(ok);
+      };
+
       try{
+        // Clear any queued speech (mobile queue can behave oddly)
+        try{ speechSynthesis.cancel(); }catch(e){}
+
         const u = new SpeechSynthesisUtterance(t);
         if(this.voice) u.voice = this.voice;
         u.rate = this.rate;
@@ -827,14 +966,19 @@ const TTS = {
         this.busy=true;
         setUILock(true);
 
-        u.onend   = ()=>{ this.busy=false; setUILock(false); resolve(true); };
-        u.onerror = ()=>{ this.busy=false; setUILock(false); resolve(false); };
+        // Safety timeout (some mobile browsers occasionally miss onend)
+        const maxMs = Math.max(2500, Math.min(9000, 600 + t.length*70));
+        const safety = setTimeout(()=>{
+          try{ speechSynthesis.cancel(); }catch(e){}
+          done(false);
+        }, maxMs);
+
+        u.onend = ()=>{ clearTimeout(safety); done(true); };
+        u.onerror = ()=>{ clearTimeout(safety); done(false); };
 
         speechSynthesis.speak(u);
       }catch(e){
-        this.busy=false;
-        setUILock(false);
-        resolve(false);
+        done(false);
       }
     });
   }
@@ -849,6 +993,7 @@ document.getElementById("ttsToggle").addEventListener("change", ()=>{
 
 document.getElementById("unlockVoice").addEventListener("click", async ()=>{
   if(TTS.busy) return;
+  TTS.prime();
   await TTS.speakOnce("Voice unlocked.");
 });
 
@@ -1086,7 +1231,13 @@ function ensureAudio(){
     if(audioCtx.state === "suspended") audioCtx.resume();
   }catch(e){}
 }
-document.addEventListener("pointerdown", ensureAudio, {once:true, capture:true});
+
+// Prime audio + TTS on first touch/click for mobile reliability
+document.addEventListener("pointerdown", ()=>{
+  ensureAudio();
+  TTS.prime();
+}, {once:true, capture:true});
+document.addEventListener("touchend", ()=>{ TTS.prime(); }, {once:true, capture:true});
 
 function playAudio(el){
   ensureAudio();
@@ -1347,7 +1498,7 @@ async function practiceNext(){
   if(TTS.enabled){
     const isFinal = (doneCount >= totalSteps);
     const phrase = (doneCount === 1 && currentItem)
-      ? sayItemValue(currentItem)          // press 1
+      ? sayItemValue(currentItem)            // press 1
       : sayTotalPhrase(totalCents, isFinal); // press 2 onwards
     await TTS.speakOnce(phrase);
   }
@@ -1447,7 +1598,7 @@ function startTimer(){
   qTimeChip.innerHTML = `<span class="miniDot"></span>Time ${quiz.secondsLeft}s`;
 
   quiz.timer = setInterval(()=>{
-    // If user leaves quiz mode, stop cleanly (prevents "timer did not set off" edge cases)
+    // If user leaves quiz mode, stop cleanly (prevents edge cases)
     if(mode !== "quiz"){
       stopTimer();
       return;
@@ -1661,4 +1812,3 @@ document.getElementById("practiceSelect").addEventListener("change", ()=>{
 </script>
 </body>
 </html>
-
